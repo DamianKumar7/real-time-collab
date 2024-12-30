@@ -105,10 +105,7 @@ func RegisterUser(w http.ResponseWriter, r *http.Request, DB *gorm.DB){
 }
 
 func LoginUser(w http.ResponseWriter, r *http.Request, DB *gorm.DB){
-	//step1: check if user exists in DB
-	//step2: decrypt the password getting from the database
-	//step3: check if the password mactches the one from the request
-	//step4: generate JWT token
+
 	var user models.User
 
 	err:= json.NewDecoder(r.Body).Decode(&user)

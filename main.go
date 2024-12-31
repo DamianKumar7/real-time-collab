@@ -13,6 +13,10 @@ func main() {
 
 	DB := config.InitDb()
 
+	pool := config.NewConnectionPool() 
+
+	go pool.StartBroadcasting()
+
 	mux:= http.NewServeMux()
 	mux.HandleFunc("/", handleRoot)
 	mux.HandleFunc("/register", func(w http.ResponseWriter, r *http.Request) {
@@ -22,6 +26,10 @@ func main() {
 		controller.LoginUser(w,r,DB)
 	})
 	mux.HandleFunc("/validate",controller.ValidateJwtToken)
+
+	mux.HandleFunc("/ws",func(w http.ResponseWriter, r *http.Request) {
+		controller.HandleWebSocketConnection(w,r,pool)
+	})
 
 	log.Println("Starting server on :8080")
 

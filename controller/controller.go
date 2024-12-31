@@ -4,11 +4,14 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"real-time-collab/config"
 	"real-time-collab/models"
 	"real-time-collab/services"
 	"real-time-collab/utils"
 	"strings"
 	"time"
+
+	"github.com/gorilla/websocket"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
@@ -16,6 +19,12 @@ import (
 type ErrorResponse struct {
 	Status  string `json:"status"`
 	Message string `json:"message"`
+}
+
+var upgradeConnection = websocket.Upgrader{
+	CheckOrigin: func(r *http.Request) bool {
+		return true
+	},	
 }
 
 type SuccessResponse[T any] struct {
@@ -155,27 +164,27 @@ func ValidateJwtToken(w http.ResponseWriter, r *http.Request) {
     authHeader := r.Header.Get("Authorization")
     if authHeader == "" {
         SendErrorResponse(w, http.StatusUnauthorized, "Authorization header is missing")
-        return
+        return 
     }
 
     // Step 2: Extract the JWT token from the Authorization header
     const bearerPrefix = "Bearer "
     if !strings.HasPrefix(authHeader, bearerPrefix) {
         SendErrorResponse(w, http.StatusUnauthorized, "Invalid Authorization header format")
-        return
+        return 
     }
 
     JwtToken := strings.TrimPrefix(authHeader, bearerPrefix)
     if JwtToken == "" {
         SendErrorResponse(w, http.StatusUnauthorized, "JWT token is missing")
-        return
+        return 
     }
 
     claims, err := utils.ExtractClaims(JwtToken)
     if err != nil {
         log.Printf("Error extracting claims: %v", err)
         SendErrorResponse(w, http.StatusUnauthorized, "Invalid or expired token")
-        return
+        return 
     }
 
 
@@ -183,7 +192,7 @@ func ValidateJwtToken(w http.ResponseWriter, r *http.Request) {
 		exp := time.Unix(int64(expiryTime),0)
 		if(time.Now().After(exp)){
 			SendErrorResponse(w, http.StatusBadRequest, "token expired")
-			return
+			return 
 		}
 	}
 
@@ -191,6 +200,22 @@ func ValidateJwtToken(w http.ResponseWriter, r *http.Request) {
 	SendJSONResponse(w, http.StatusOK, "token is valid")
 }
 
+func HandleWebSocketConnection(w http.ResponseWriter, r *http.Request, pool *config.ConnectionPool){
 
+	// if(ValidateJwtToken(w,r)){
+	// 	log.Printf("jwt token is expired")
+	// 	return
+	// }
+	
+	connection, err := upgradeConnection.Upgrade(w, r ,nil)
+	if err != nil{
+		log.Printf("connection refused")
+		return 
+	}
+	
+	pool.Mutex.Lock()
+	pool.Connections[connection] = true
+	pool.Mutex.Unlock()
 
-
+	go pool.ReadMessage(connection)
+}

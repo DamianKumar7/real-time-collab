@@ -42,7 +42,7 @@ type ConnectionPool struct{
     Connections map[*websocket.Conn]bool
     sync.Mutex
     Broadcast chan []byte
-    MessageQueue []byte
+    MessageQueue chan []byte
 }
 
 func NewConnectionPool() *ConnectionPool{
@@ -105,12 +105,10 @@ func PersistData(message []byte, db *gorm.DB) error {
         return fmt.Errorf("failed to unmarshal data: %w", err)
     }
 
-    // Validate required fields
     if documentEvent.DocID == "" || documentEvent.Operation == "" {
         return fmt.Errorf("missing required fields")
     }
 
-    // Use a transaction for atomic operations
     return db.Transaction(func(tx *gorm.DB) error {
         if err := tx.Create(&documentEvent).Error; err != nil {
             return fmt.Errorf("failed to save event: %w", err)

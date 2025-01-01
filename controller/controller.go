@@ -219,3 +219,17 @@ func HandleWebSocketConnection(w http.ResponseWriter, r *http.Request, pool *con
 
 	go pool.ReadMessage(connection, DB)
 }
+
+
+func StoreDocument(w http.ResponseWriter, r *http.Request, DB *gorm.DB){
+	var Document models.Document
+	request:= json.NewDecoder(r.Body).Decode(&Document)
+	if request == nil{
+		SendErrorResponse(w,http.StatusBadRequest,"Wrong request body")
+	}
+	tx :=DB.Save(Document)
+	if(tx.Error != nil){
+		SendErrorResponse(w,http.StatusInternalServerError, tx.Error.Error())
+	}
+	SendJSONResponse(w,http.StatusAccepted,"created document in DB")
+}

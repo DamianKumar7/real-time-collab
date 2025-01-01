@@ -42,6 +42,7 @@ type ConnectionPool struct{
     Connections map[*websocket.Conn]bool
     sync.Mutex
     Broadcast chan []byte
+    MessageQueue []byte
 }
 
 func NewConnectionPool() *ConnectionPool{
@@ -81,20 +82,13 @@ func (pool *ConnectionPool) ReadMessage(connection *websocket.Conn, DB *gorm.DB)
 
         log.Printf("trying to read message")
         _,message,err := connection.ReadMessage()
-        go PersistData(message, DB)
         if err != nil {
             if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
                 log.Printf("Error reading message: %v", err)
             }
             return
         }
-        if(err != nil){
-            log.Printf("error reading message  %v",err.Error())
-            connection.Close()
-            return
-        }
         go func(){
-
             err:= PersistData(message, DB)
             if(err!= nil){
                 log.Printf("error persisting data error %v",err.Error())

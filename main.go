@@ -31,6 +31,10 @@ func main() {
 		controller.HandleWebSocketConnection(w,r,pool,DB)
 	})
 
+	mux.HandleFunc("/doc",func(w http.ResponseWriter, r *http.Request) {
+		controller.StoreDocument(w,r,DB)
+	})
+
 	log.Println("Starting server on :8080")
 
 	err:= http.ListenAndServe(":8080", mux)

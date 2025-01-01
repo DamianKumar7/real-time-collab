@@ -28,7 +28,7 @@ func main() {
 	mux.HandleFunc("/validate",controller.ValidateJwtToken)
 
 	mux.HandleFunc("/ws",func(w http.ResponseWriter, r *http.Request) {
-		controller.HandleWebSocketConnection(w,r,pool)
+		controller.HandleWebSocketConnection(w,r,pool,DB)
 	})
 
 	log.Println("Starting server on :8080")

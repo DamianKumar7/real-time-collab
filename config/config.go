@@ -1,9 +1,11 @@
 package config
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
+	"real-time-collab/models"
 	"sync"
 
 	"github.com/gorilla/websocket"
@@ -12,6 +14,7 @@ import (
 )
 
 var DbConnection *gorm.DB
+var DocumentEvent models.DocumentEvent
 
 // Initialize the database connection
 func InitDb() *gorm.DB {
@@ -67,7 +70,7 @@ func (pool *ConnectionPool) StartBroadcasting(){
 }
 
 
-func (pool *ConnectionPool) ReadMessage(connection *websocket.Conn){
+func (pool *ConnectionPool) ReadMessage(connection *websocket.Conn, DB *gorm.DB){
     defer func(){
         pool.Mutex.Lock()
         delete(pool.Connections, connection)
@@ -78,11 +81,95 @@ func (pool *ConnectionPool) ReadMessage(connection *websocket.Conn){
 
         log.Printf("trying to read message")
         _,message,err := connection.ReadMessage()
+        go PersistData(message, DB)
+        if err != nil {
+            if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
+                log.Printf("Error reading message: %v", err)
+            }
+            return
+        }
         if(err != nil){
             log.Printf("error reading message  %v",err.Error())
             connection.Close()
             return
         }
+        go func(){
+
+            err:= PersistData(message, DB)
+            if(err!= nil){
+                log.Printf("error persisting data error %v",err.Error())
+            }
+        }()
         pool.Broadcast <- message
     }
+}
+
+
+func PersistData(message []byte, db *gorm.DB) error {
+    var documentEvent models.DocumentEvent
+    if err := json.Unmarshal(message, &documentEvent); err != nil {
+        return fmt.Errorf("failed to unmarshal data: %w", err)
+    }
+
+    // Validate required fields
+    if documentEvent.DocID == "" || documentEvent.Operation == "" {
+        return fmt.Errorf("missing required fields")
+    }
+
+    // Use a transaction for atomic operations
+    return db.Transaction(func(tx *gorm.DB) error {
+        if err := tx.Create(&documentEvent).Error; err != nil {
+            return fmt.Errorf("failed to save event: %w", err)
+        }
+
+        if err := PersistDocumentSnapshot(documentEvent, tx); err != nil {
+            return fmt.Errorf("failed to update document: %w", err)
+        }
+
+        return nil
+    })
+}
+
+
+func PersistDocumentSnapshot(event models.DocumentEvent, db *gorm.DB) error {
+    var document models.Document
+    if err := db.First(&document, "id = ?", event.DocID).Error; err != nil {
+        return fmt.Errorf("failed to fetch document: %w", err)
+    }
+
+    if err := applyChangesToDocument(&document, event); err != nil {
+        return fmt.Errorf("failed to apply changes: %w", err)
+    }
+
+    return db.Save(&document).Error
+}
+
+func applyChangesToDocument(doc *models.Document, event models.DocumentEvent) error {
+    contentLen := len(doc.Content)
+    
+    if event.Position < 0 || event.Position > contentLen {
+        return fmt.Errorf("invalid position: %d", event.Position)
+    }
+
+    switch event.Operation {
+    case "insert":
+        doc.Content = doc.Content[:event.Position] + event.Content + doc.Content[event.Position:]
+    
+    case "delete":
+        if event.Position+event.Length > contentLen {
+            return fmt.Errorf("deletion range exceeds content length")
+        }
+        doc.Content = doc.Content[:event.Position] + doc.Content[event.Position+event.Length:]
+    
+    case "replace":
+        if event.Position+event.Length > contentLen {
+            return fmt.Errorf("replacement range exceeds content length")
+        }
+        doc.Content = doc.Content[:event.Position] + event.Content + doc.Content[event.Length+event.Position:]
+    
+    default:
+        return fmt.Errorf("invalid operation: %s", event.Operation)
+    }
+
+    return nil
 }

@@ -200,7 +200,7 @@ func ValidateJwtToken(w http.ResponseWriter, r *http.Request) {
 	SendJSONResponse(w, http.StatusOK, "token is valid")
 }
 
-func HandleWebSocketConnection(w http.ResponseWriter, r *http.Request, pool *config.ConnectionPool){
+func HandleWebSocketConnection(w http.ResponseWriter, r *http.Request, pool *config.ConnectionPool, DB *gorm.DB){
 
 	// if(ValidateJwtToken(w,r)){
 	// 	log.Printf("jwt token is expired")
@@ -212,10 +212,10 @@ func HandleWebSocketConnection(w http.ResponseWriter, r *http.Request, pool *con
 		log.Printf("connection refused")
 		return 
 	}
-	
+
 	pool.Mutex.Lock()
 	pool.Connections[connection] = true
 	pool.Mutex.Unlock()
 
-	go pool.ReadMessage(connection)
+	go pool.ReadMessage(connection, DB)
 }

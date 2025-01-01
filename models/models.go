@@ -17,16 +17,20 @@ type User struct {
 
 
 type Document struct{
-	ID string `json:"id"`
+	gorm.Model
 	Content string `json:"content"`
-	CreatedAt string `json:"createdAt"`
-	ModifiedAt string `json:"modifiedAt"`
 }
 
 type DocumentEvent struct{
+	gorm.Model
 	DocID     string    `json:"doc_id"`
     UserID    string    `json:"user_id"`
-    Operation string    `json:"operation"` // JSON string of the operation
+    Operation string    `json:"operation"`
     Timestamp time.Time `json:"timestamp"`
+	Position  int 		`json:"position"`
+	Length     int 		`json:"length"`
+	Content	  string 	`json:"content"`
 }
+
+
 

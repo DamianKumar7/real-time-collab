@@ -13,8 +13,10 @@ func main() {
 
 	DB := config.InitDb()
 
-	pool := config.NewConnectionPool() 
+	workers := 40
 
+	pool := config.NewConnectionPool(workers,DB) 
+	
 	go pool.StartBroadcasting()
 
 	mux:= http.NewServeMux()

@@ -45,10 +45,25 @@ type ConnectionPool struct{
     MessageQueue chan []byte
 }
 
-func NewConnectionPool() *ConnectionPool{
-    return &ConnectionPool{
+func NewConnectionPool(workers int, DB *gorm.DB) *ConnectionPool{
+    pool :=  &ConnectionPool{
         Connections: make(map[*websocket.Conn]bool),
         Broadcast: make(chan []byte),
+        MessageQueue: make(chan []byte),
+    }
+    for i:= 0;i <workers;i++{
+        go pool.worker(i,DB)
+    }
+    return pool
+}
+
+func (pool * ConnectionPool)worker(worker int, DB *gorm.DB){
+    for message:= range pool.MessageQueue{
+        if err := PersistData(message, DB); err != nil {
+            log.Printf("Worker %d: Failed to persist data: %v", worker, err)
+            continue
+        }
+        pool.Broadcast <- message
     }
 }
 
@@ -88,18 +103,13 @@ func (pool *ConnectionPool) ReadMessage(connection *websocket.Conn, DB *gorm.DB)
             }
             return
         }
-        go func(){
-            err:= PersistData(message, DB)
-            if(err!= nil){
-                log.Printf("error persisting data error %v",err.Error())
-            }
-        }()
         pool.Broadcast <- message
     }
 }
 
 
 func PersistData(message []byte, db *gorm.DB) error {
+
     var documentEvent models.DocumentEvent
     if err := json.Unmarshal(message, &documentEvent); err != nil {
         return fmt.Errorf("failed to unmarshal data: %w", err)

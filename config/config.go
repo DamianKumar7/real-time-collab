@@ -7,7 +7,6 @@ import (
 	"os"
 	"real-time-collab/models"
 	"sync"
-
 	"github.com/gorilla/websocket"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -103,7 +102,7 @@ func (pool *ConnectionPool) ReadMessage(connection *websocket.Conn, DB *gorm.DB)
             }
             return
         }
-        pool.Broadcast <- message
+        pool.MessageQueue <- message
     }
 }
 

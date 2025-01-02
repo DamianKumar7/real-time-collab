@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"real-time-collab/config"
 	"real-time-collab/controller"
+	"real-time-collab/models"
 )
 
 
@@ -15,8 +16,12 @@ func main() {
 
 	workers := 40
 
+	DB.AutoMigrate(&models.DocumentEvent{})
+	DB.AutoMigrate(&models.Document{})
+
+
 	pool := config.NewConnectionPool(workers,DB) 
-	
+
 	go pool.StartBroadcasting()
 
 	mux:= http.NewServeMux()

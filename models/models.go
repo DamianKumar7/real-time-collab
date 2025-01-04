@@ -19,6 +19,7 @@ type User struct {
 type Document struct{
 	gorm.Model
 	Content string `json:"content"`
+	Version int `json:"version"`
 }
 
 type DocumentEvent struct{
@@ -29,7 +30,8 @@ type DocumentEvent struct{
     Timestamp time.Time `json:"timestamp"`
 	Position  int 		`json:"position"`
 	Length     int 		`json:"length"`
-	Content	  string 	`json:"content"`
+	Content	 string 	`json:"content"`
+	Version int 	`json:"doc_version"` 
 }
 
 

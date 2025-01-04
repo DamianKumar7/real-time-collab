@@ -227,7 +227,7 @@ func StoreDocument(w http.ResponseWriter, r *http.Request, DB *gorm.DB){
 	if request == nil{
 		SendErrorResponse(w,http.StatusBadRequest,"Wrong request body")
 	}
-	tx :=DB.Save(Document)
+	tx :=DB.Save(&Document)
 	if(tx.Error != nil){
 		SendErrorResponse(w,http.StatusInternalServerError, tx.Error.Error())
 	}

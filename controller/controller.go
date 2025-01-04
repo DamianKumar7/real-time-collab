@@ -2,6 +2,7 @@ package controller
 
 import (
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 	"real-time-collab/config"
@@ -34,8 +35,7 @@ type SuccessResponse[T any] struct {
 }
 
 func SendJSONResponse(w http.ResponseWriter, status int, payload interface{}) {
-	// Always set headers before writing the status code
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Type", "*")
 	w.Header().Set("Access-Control-Allow-Origin", "*") // For CORS, if needed
 	w.WriteHeader(status)
 
@@ -62,11 +62,10 @@ func SendErrorResponse(w http.ResponseWriter, status int, message string) {
 
 func RegisterUser(w http.ResponseWriter, r *http.Request, DB *gorm.DB){
 	var user models.User
-
-
+	log.Println("Inside register user method")
 	//parse the request body and decode it into the User struct
 	err:= json.NewDecoder(r.Body).Decode(&user)
-
+	log.Println("Deoded the request body in valid user")
 	if(err!= nil){
 		SendErrorResponse(w, http.StatusBadRequest, err.Error())
 		return
@@ -131,7 +130,7 @@ func LoginUser(w http.ResponseWriter, r *http.Request, DB *gorm.DB){
 
 	var userFromDb models.User
 
-	exists,err := services.FindUserByUsername(&userFromDb,DB,user.Username)
+	exists,err := services.FindUserByEmailId(&userFromDb,DB,user.Email)
 
 	if(err!= nil){
 		SendErrorResponse(w,http.StatusInternalServerError,"error occured while trying to fetch the DB")
@@ -159,54 +158,48 @@ func LoginUser(w http.ResponseWriter, r *http.Request, DB *gorm.DB){
 
 }
 
-func ValidateJwtToken(w http.ResponseWriter, r *http.Request) {
+func ValidateJwtToken(w http.ResponseWriter, r *http.Request) error {
     // Step 1: Retrieve the Authorization header
     authHeader := r.Header.Get("Authorization")
     if authHeader == "" {
-        SendErrorResponse(w, http.StatusUnauthorized, "Authorization header is missing")
-        return 
+        return errors.New("authorization header is missing")
     }
 
     // Step 2: Extract the JWT token from the Authorization header
     const bearerPrefix = "Bearer "
     if !strings.HasPrefix(authHeader, bearerPrefix) {
-        SendErrorResponse(w, http.StatusUnauthorized, "Invalid Authorization header format")
-        return 
+        return errors.New("bearer prefix Not Present in the Authorization Header")
     }
 
     JwtToken := strings.TrimPrefix(authHeader, bearerPrefix)
     if JwtToken == "" {
-        SendErrorResponse(w, http.StatusUnauthorized, "JWT token is missing")
-        return 
+        return errors.New("jwt token is missing")
     }
 
     claims, err := utils.ExtractClaims(JwtToken)
     if err != nil {
         log.Printf("Error extracting claims: %v", err)
-        SendErrorResponse(w, http.StatusUnauthorized, "Invalid or expired token")
-        return 
+        return errors.New("error extracting claims from token")
     }
 
 
 	if expiryTime,exists:= claims["exp"].(float64);exists{
 		exp := time.Unix(int64(expiryTime),0)
 		if(time.Now().After(exp)){
-			SendErrorResponse(w, http.StatusBadRequest, "token expired")
-			return 
+			return errors.New("token Expired")
 		}
 	}
 
     log.Printf("Extracted claims: %+v", claims)
-	SendJSONResponse(w, http.StatusOK, "token is valid")
+	return nil
 }
 
 func HandleWebSocketConnection(w http.ResponseWriter, r *http.Request, pool *config.ConnectionPool, DB *gorm.DB){
 
-	// if(ValidateJwtToken(w,r)){
-	// 	log.Printf("jwt token is expired")
-	// 	return
-	// }
-	
+	if err:= ValidateJwtToken(w,r);err!= nil{
+		log.Println("Error validating JWT token %v",err.Error())
+	}
+
 	connection, err := upgradeConnection.Upgrade(w, r ,nil)
 	if err != nil{
 		log.Printf("connection refused")

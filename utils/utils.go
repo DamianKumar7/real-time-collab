@@ -2,8 +2,11 @@ package utils
 
 import (
 	"fmt"
+	"real-time-collab/models"
 	"time"
+
 	"github.com/golang-jwt/jwt/v4"
+	"gorm.io/gorm"
 )
 
 var jwtSecret = []byte("real_time_collab")
@@ -51,4 +54,10 @@ func ExtractClaims(tokenString string) (map[string]interface{}, error) {
 	}
 
 	return nil, fmt.Errorf("invalid token")
+}
+
+func AutoMigrateModels(DB *gorm.DB){
+	DB.AutoMigrate(&models.DocumentEvent{})
+	DB.AutoMigrate(&models.Document{})
+	DB.AutoMigrate(&models.User{})
 }

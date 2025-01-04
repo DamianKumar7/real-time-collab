@@ -171,7 +171,6 @@ func (pool *ConnectionPool) ReadMessage(connection *websocket.Conn, DB *gorm.DB)
         connection.Close()
     }()
     for{
-
         log.Printf("trying to read message")
         _,message,err := connection.ReadMessage()
         if err != nil {

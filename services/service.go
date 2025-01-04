@@ -19,8 +19,8 @@ func IsUserPresent(user *models.User, DB *gorm.DB, email string) (bool, error) {
     return true, nil
 }
 
-func FindUserByUsername(user *models.User, DB *gorm.DB, username string) (bool,error){
-	result := DB.Where("username = ?", username).First(user)
+func FindUserByEmailId(user *models.User, DB *gorm.DB, email string) (bool,error){
+	result := DB.Where("email = ?", email).First(user)
     
     if result.Error == gorm.ErrRecordNotFound {
         return false, nil  

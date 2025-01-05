@@ -193,16 +193,12 @@ func ValidateJwtToken(w http.ResponseWriter, r *http.Request) error {
 		}
 	}
 
-    log.Printf("Extracted claims: %+v", claims)
+    log.Print("Extracted claims: %+v", claims)
+	log.Println("JWT authentication succesful")
 	return nil
 }
 
 func HandleWebSocketConnection(w http.ResponseWriter, r *http.Request, pool *config.ConnectionPool, DB *gorm.DB){
-
-	if err:= ValidateJwtToken(w,r);err!= nil{
-		log.Printf("Error validating JWT token %v",err.Error())
-		SendErrorResponse(w,http.StatusUnauthorized,err.Error())
-	}
 
 	connection, err := upgradeConnection.Upgrade(w, r ,nil)
 	if err != nil{

@@ -2,7 +2,6 @@ package models
 
 import (
 	"time"
-
 	"github.com/jinzhu/gorm"
 )
 
@@ -20,6 +19,7 @@ type Document struct{
 	gorm.Model
 	Content string `json:"content"`
 	Version int `json:"version"`
+	Title string `json:"title"`
 }
 
 type DocumentEvent struct{

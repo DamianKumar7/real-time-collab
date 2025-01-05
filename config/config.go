@@ -6,7 +6,9 @@ import (
 	"log"
 	"os"
 	"real-time-collab/models"
+	"strconv"
 	"sync"
+
 	"github.com/gorilla/websocket"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -102,7 +104,11 @@ func validateDocumentEvent(event *models.DocumentEvent) error {
 
 func transformDocumentEvent(CurrentDocumentEvent *models.DocumentEvent, DB *gorm.DB, Document *models.Document) error  {
     DB.Transaction( func(tx *gorm.DB) error {
-        err:= tx.First(Document,"id =?",CurrentDocumentEvent.DocID).Error
+        docID, err := strconv.ParseUint(CurrentDocumentEvent.DocID, 10, 64)
+        if err!= nil{
+            return fmt.Errorf("failed to parse document id")
+        }
+        err= tx.First(Document,"id =?",docID).Error
         if err!= nil{
             return fmt.Errorf("failed to fetch document: %w", err)
         }

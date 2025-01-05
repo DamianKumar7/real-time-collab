@@ -32,6 +32,7 @@ type DocumentEvent struct{
 	Length     int 		`json:"length"`
 	Content	 string 	`json:"content"`
 	Version int 	`json:"doc_version"` 
+	Title string    `json:"title"`
 }
 
 

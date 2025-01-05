@@ -9,6 +9,7 @@ import (
 	"real-time-collab/models"
 	"real-time-collab/services"
 	"real-time-collab/utils"
+	"strconv"
 	"strings"
 	"time"
 
@@ -154,7 +155,7 @@ func LoginUser(w http.ResponseWriter, r *http.Request, DB *gorm.DB){
 		SendErrorResponse(w,http.StatusInternalServerError,"error generating jwt")
 	}
 
-	SendJSONResponse(w,http.StatusAccepted,map[string]string{"token":jwtToken})
+	SendJSONResponse(w,http.StatusAccepted,map[string]string{"token":jwtToken,"username":userFromDb.Username,"userId":strconv.FormatUint(uint64(userFromDb.ID), 10)})
 
 }
 
@@ -197,7 +198,8 @@ func ValidateJwtToken(w http.ResponseWriter, r *http.Request) error {
 func HandleWebSocketConnection(w http.ResponseWriter, r *http.Request, pool *config.ConnectionPool, DB *gorm.DB){
 
 	if err:= ValidateJwtToken(w,r);err!= nil{
-		log.Println("Error validating JWT token %v",err.Error())
+		log.Printf("Error validating JWT token %v",err.Error())
+		SendErrorResponse(w,http.StatusUnauthorized,err.Error())
 	}
 
 	connection, err := upgradeConnection.Upgrade(w, r ,nil)
@@ -225,4 +227,32 @@ func StoreDocument(w http.ResponseWriter, r *http.Request, DB *gorm.DB){
 		SendErrorResponse(w,http.StatusInternalServerError, tx.Error.Error())
 	}
 	SendJSONResponse(w,http.StatusAccepted,"created document in DB")
+}
+
+func GetDocuments(w http.ResponseWriter, r *http.Request, DB *gorm.DB){
+	var Documents []models.Document
+	if err:= ValidateJwtToken(w,r);err!= nil{
+		SendErrorResponse(w,http.StatusUnauthorized,"authentication failed")
+	}
+	tx := DB.Find(&Documents)
+	if tx.Error != nil{
+		SendErrorResponse(w,http.StatusInternalServerError,"Failed to retrive data from the DB")
+	}
+	SendJSONResponse(w,http.StatusOK,Documents)
+}
+
+func GetDocumentById(w http.ResponseWriter, r *http.Request,DB *gorm.DB, DocId string){
+	if err:=ValidateJwtToken(w,r);err!=nil{
+		SendErrorResponse(w,http.StatusUnauthorized,"authentication failed")
+	}
+	var Document models.Document
+	DocIdUint,err := strconv.ParseUint(DocId,10,64)
+	if err!= nil{
+		SendErrorResponse(w,http.StatusInternalServerError,"Error Parsing the document id")
+	}
+	tx := DB.First(&Document, "id=?", DocIdUint)
+	if tx.Error != nil{
+		SendErrorResponse(w,http.StatusBadRequest, "Error fetching the data from the DB")
+	}
+	SendJSONResponse(w,http.StatusOK,Document)
 }

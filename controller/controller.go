@@ -155,6 +155,8 @@ func LoginUser(w http.ResponseWriter, r *http.Request, DB *gorm.DB){
 		SendErrorResponse(w,http.StatusInternalServerError,"error generating jwt")
 	}
 
+	log.Print("Login Successful for user")
+
 	SendJSONResponse(w,http.StatusAccepted,map[string]string{"token":jwtToken,"username":userFromDb.Username,"userId":strconv.FormatUint(uint64(userFromDb.ID), 10)})
 
 }

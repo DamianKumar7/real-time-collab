@@ -28,4 +28,8 @@ func SetRoutesForMux(mux *http.ServeMux, DB *gorm.DB,pool *config.ConnectionPool
 		controller.GetDocumentById(w,r,DB,DocId)
 	})
 
+	mux.HandleFunc("/documents",func(w http.ResponseWriter, r *http.Request){
+		controller.GetDocuments(w,r,DB)
+	})
+
 }

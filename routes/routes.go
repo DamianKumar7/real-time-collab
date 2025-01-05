@@ -19,7 +19,7 @@ func SetRoutesForMux(mux *http.ServeMux, DB *gorm.DB,pool *config.ConnectionPool
 		controller.HandleWebSocketConnection(w,r,pool,DB)
 	})
 
-	mux.HandleFunc("/save-document",func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/documents/create",func(w http.ResponseWriter, r *http.Request) {
 		controller.StoreDocument(w,r,DB)
 	})
 

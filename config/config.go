@@ -170,11 +170,14 @@ func (pool *ConnectionPool) StartBroadcasting(){
 
 
 func (pool *ConnectionPool) ReadMessage(connection *websocket.Conn, DB *gorm.DB){
-    defer func(){
-        pool.Mutex.Lock()
-        delete(pool.Connections, connection)
-        pool.Mutex.Unlock()
-        connection.Close()
+     defer func() {
+        if r := recover(); r != nil {
+            log.Printf("Recovered from panic: %v", r)
+            pool.Mutex.Lock()
+            delete(pool.Connections, connection)
+            pool.Mutex.Unlock()
+            connection.Close()
+        }
     }()
     for{
         log.Printf("trying to read message")

@@ -216,15 +216,16 @@ func HandleWebSocketConnection(w http.ResponseWriter, r *http.Request, pool *con
 
 func StoreDocument(w http.ResponseWriter, r *http.Request, DB *gorm.DB){
 	var Document models.Document
-	request:= json.NewDecoder(r.Body).Decode(&Document)
-	if request == nil{
+	log.Printf("request body is %v", r.Body)
+	err:= json.NewDecoder(r.Body).Decode(&Document)
+	if err != nil{
 		SendErrorResponse(w,http.StatusBadRequest,"Wrong request body")
 	}
 	tx :=DB.Save(&Document)
 	if(tx.Error != nil){
 		SendErrorResponse(w,http.StatusInternalServerError, tx.Error.Error())
 	}
-	SendJSONResponse(w,http.StatusAccepted,"created document in DB")
+	SendJSONResponse(w,http.StatusOK,"created document in DB")
 }
 
 func GetDocuments(w http.ResponseWriter, r *http.Request, DB *gorm.DB){

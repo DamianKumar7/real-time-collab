@@ -8,7 +8,7 @@ import (
 	"real-time-collab/models"
 	"strconv"
 	"sync"
-
+    "log/slog"
 	"github.com/gorilla/websocket"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -81,7 +81,10 @@ func (pool *ConnectionPool) worker(worker int, DB *gorm.DB) {
             log.Printf("worker %d: failed to persist data: %v", worker, err)
             continue
         }
-    
+
+        //we need to set the document content newly edited to be the content the client gets. I fucked up
+        documentEvent.Content = document.Content
+        slog.Info("The document event being sent to the server is %v", documentEvent)
         transformedMsg, err := json.Marshal(documentEvent)
         if err != nil {
             log.Printf("worker %d: failed to marshal transformed event: %v", worker, err)

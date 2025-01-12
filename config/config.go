@@ -124,7 +124,7 @@ func transformDocumentEvent(CurrentDocumentEvent *models.DocumentEvent, DB *gorm
                 return fmt.Errorf("failed to fetch previous document changes: %w", err)
             }
             for _,DocumentChange:= range prevDocumentChanges{
-                ProcessTransformation(CurrentDocumentEvent,DocumentChange)
+                ProcessTransformation(CurrentDocumentEvent,DocumentChange,Document)
             }            
         }
         return nil
@@ -132,12 +132,14 @@ func transformDocumentEvent(CurrentDocumentEvent *models.DocumentEvent, DB *gorm
     return nil
 }
 
-func ProcessTransformation(current *models.DocumentEvent, previous models.DocumentEvent) {
+func ProcessTransformation(current *models.DocumentEvent, previous models.DocumentEvent, doc *models.Document) {
     switch {
     case current.Operation == "insert" && previous.Operation == "insert":
-        if current.Position > previous.Position {
+        slog.Info("current position: %v previous position: %v previous length: %v",current.Position,previous.Position,previous.Length)
+        if current.Position > (previous.Position + len(doc.Content)) {
             current.Position += previous.Length
         }
+
     case current.Operation == "insert" && previous.Operation == "delete":
         if current.Position > previous.Position {
             current.Position -= previous.Length
@@ -218,7 +220,7 @@ func PersistDocumentSnapshot(event *models.DocumentEvent, db *gorm.DB, Doc *mode
 
 func applyChangesToDocument(doc *models.Document, event *models.DocumentEvent) error {
     if event.Position < 0 || event.Position > len(doc.Content) {
-        return fmt.Errorf("invalid position: %d (content length: %d)", event.Position, len(doc.Content))
+        return fmt.Errorf("invalid position for character : %v position: %d (content length: %d)",event.Content, event.Position, len(doc.Content))
     }
 
     doc.Version++

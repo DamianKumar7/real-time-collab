@@ -3,6 +3,7 @@ package utils
 import (
 	"fmt"
 	"real-time-collab/models"
+	"strconv"
 	"time"
 
 	"github.com/golang-jwt/jwt/v4"
@@ -15,7 +16,7 @@ var jwtSecret = []byte("real_time_collab")
 func GenerateJWT(userID uint, email string) (string, error) {
 	// Define the token claims
 	claims := jwt.MapClaims{
-		"sub":  userID,                    // Subject (user ID)
+		"sub":  strconv.FormatUint(uint64(userID),10),                    // Subject (user ID)
 		"email": email,                    // User email
 		"exp":   time.Now().Add(time.Hour * 24).Unix(), // Expiration time (24 hours)
 		"iat":   time.Now().Unix(),        // Issued at

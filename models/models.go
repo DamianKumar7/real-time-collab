@@ -20,6 +20,7 @@ type Document struct{
 	Content string `json:"content"`
 	Version int `json:"version"`
 	Title string `json:"title"`
+	CreatedBy string `json:"createdBy"`
 }
 
 type DocumentEvent struct{

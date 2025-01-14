@@ -155,15 +155,15 @@ func ProcessTransformation(current *models.DocumentEvent, previous models.Docume
         }
 
     case current.Operation == "insert" && previous.Operation == "delete":
-        if current.Position > previous.Position {
+        if current.Position >(previous.Position + len(doc.Content)) {
             current.Position -= previous.Length
         }
     case current.Operation == "delete" && previous.Operation == "insert":
-        if current.Position > previous.Position {
+        if current.Position > (previous.Position + len(doc.Content)) {
             current.Position += previous.Length
         }
     case current.Operation == "delete" && previous.Operation == "delete":
-        if current.Position > previous.Position {
+        if current.Position > (previous.Position + len(doc.Content)) {
             current.Position -= previous.Length
         }
     }

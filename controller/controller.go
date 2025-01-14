@@ -3,6 +3,7 @@ package controller
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"real-time-collab/config"
@@ -161,41 +162,51 @@ func LoginUser(w http.ResponseWriter, r *http.Request, DB *gorm.DB){
 
 }
 
-func ValidateJwtToken(w http.ResponseWriter, r *http.Request) error {
+func ValidateJwtToken(w http.ResponseWriter, r *http.Request) (string, error) {
     // Step 1: Retrieve the Authorization header
     authHeader := r.Header.Get("Authorization")
     if authHeader == "" {
-        return errors.New("authorization header is missing")
+        return "", errors.New("authorization header is missing")
     }
 
     // Step 2: Extract the JWT token from the Authorization header
     const bearerPrefix = "Bearer "
     if !strings.HasPrefix(authHeader, bearerPrefix) {
-        return errors.New("bearer prefix Not Present in the Authorization Header")
+        return "", errors.New("bearer prefix not present in the Authorization Header")
     }
 
-    JwtToken := strings.TrimPrefix(authHeader, bearerPrefix)
-    if JwtToken == "" {
-        return errors.New("jwt token is missing")
+    jwtToken := strings.TrimPrefix(authHeader, bearerPrefix)
+    if jwtToken == "" {
+        return "", errors.New("jwt token is missing")
     }
 
-    claims, err := utils.ExtractClaims(JwtToken)
+    // Step 3: Extract and validate claims
+    claims, err := utils.ExtractClaims(jwtToken)
     if err != nil {
         log.Printf("Error extracting claims: %v", err)
-        return errors.New("error extracting claims from token")
+        return "", fmt.Errorf("error extracting claims from token: %w", err)
     }
 
+    // Step 4: Check token expiration
+    if expiryTime, exists := claims["exp"].(float64); exists {
+        exp := time.Unix(int64(expiryTime), 0)
+        if time.Now().After(exp) {
+            return "", errors.New("token expired")
+        }
+    } else {
+        return "", errors.New("expiration claim missing from token")
+    }
 
-	if expiryTime,exists:= claims["exp"].(float64);exists{
-		exp := time.Unix(int64(expiryTime),0)
-		if(time.Now().After(exp)){
-			return errors.New("token Expired")
-		}
-	}
-
-    log.Print("Extracted claims: %+v", claims)
-	log.Println("JWT authentication succesful")
-	return nil
+    // Step 5: Extract and return user ID
+    if userId, exists := claims["sub"]; exists {
+        if userIdStr, ok := userId.(string); ok {
+            log.Printf("JWT authentication successful for user: %s", userIdStr)
+            return userIdStr, nil
+        }
+        return "", errors.New("user id claim is not a string")
+    }
+    
+    return "", errors.New("user id claim missing from token")
 }
 
 func HandleWebSocketConnection(w http.ResponseWriter, r *http.Request, pool *config.ConnectionPool, DB *gorm.DB){
@@ -230,10 +241,11 @@ func StoreDocument(w http.ResponseWriter, r *http.Request, DB *gorm.DB){
 
 func GetDocuments(w http.ResponseWriter, r *http.Request, DB *gorm.DB){
 	var Documents []models.Document
-	if err:= ValidateJwtToken(w,r);err!= nil{
+	userId,err:= ValidateJwtToken(w,r)
+	if err!= nil{
 		SendErrorResponse(w,http.StatusUnauthorized,"authentication failed")
 	}
-	tx := DB.Find(&Documents)
+	tx := DB.Where("createdBy= ? ",userId).Find(&Documents)
 	if tx.Error != nil{
 		SendErrorResponse(w,http.StatusInternalServerError,"Failed to retrive data from the DB")
 	}
@@ -241,7 +253,7 @@ func GetDocuments(w http.ResponseWriter, r *http.Request, DB *gorm.DB){
 }
 
 func GetDocumentById(w http.ResponseWriter, r *http.Request,DB *gorm.DB, DocId string){
-	if err:=ValidateJwtToken(w,r);err!=nil{
+	if _,err:=ValidateJwtToken(w,r);err!=nil{
 		SendErrorResponse(w,http.StatusUnauthorized,"authentication failed")
 	}
 	var Document models.Document

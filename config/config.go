@@ -18,7 +18,6 @@ var DbConnection *gorm.DB
 
 // Initialize the database connection
 func InitDb() *gorm.DB {
-    // Database connection details
     connectionDetails := fmt.Sprintf(
         "host=%s user=%s password=%s dbname=%s port=%s sslmode=disable",
         os.Getenv("DB_HOST"),    // Read from environment variable
@@ -28,7 +27,6 @@ func InitDb() *gorm.DB {
         os.Getenv("DB_PORT"),    // Read from environment variable
     )
 
-    // Open the database connection using GORM
     db, err := gorm.Open(postgres.Open(connectionDetails), &gorm.Config{})
     if err != nil {
         log.Fatalf("Error connecting to the database: %v", err)
@@ -41,15 +39,27 @@ func InitDb() *gorm.DB {
 type ConnectionPool struct{
     Connections map[*websocket.Conn]bool
     sync.Mutex
-    Broadcast chan []byte
-    MessageQueue chan []byte
+    Broadcast chan BroadcastMessage
+    MessageQueue chan QueuedMessage
+
 }
+
+type QueuedMessage struct {
+    Data []byte
+    Sender *websocket.Conn
+}
+
+type BroadcastMessage struct {
+    Data []byte
+    ExcludeConn *websocket.Conn
+}
+
 
 func NewConnectionPool(workers int, DB *gorm.DB) *ConnectionPool{
     pool :=  &ConnectionPool{
         Connections: make(map[*websocket.Conn]bool),
-        Broadcast: make(chan []byte),
-        MessageQueue: make(chan []byte),
+        Broadcast: make(chan BroadcastMessage),
+        MessageQueue: make(chan QueuedMessage),
     }
     for i:= 0;i <workers;i++{
         go pool.worker(i,DB)
@@ -61,8 +71,9 @@ func (pool *ConnectionPool) worker(worker int, DB *gorm.DB) {
     for message := range pool.MessageQueue {
         var documentEvent models.DocumentEvent
         var document models.Document
+        var broadcastMessage BroadcastMessage
         
-        if err := json.Unmarshal(message, &documentEvent); err != nil {
+        if err := json.Unmarshal(message.Data, &documentEvent); err != nil {
             log.Printf("worker %d: failed to unmarshal data: %v", worker, err)
             continue
         }
@@ -90,8 +101,10 @@ func (pool *ConnectionPool) worker(worker int, DB *gorm.DB) {
             log.Printf("worker %d: failed to marshal transformed event: %v", worker, err)
             continue
         }
+        broadcastMessage.Data = transformedMsg
+        broadcastMessage.ExcludeConn = message.Sender
         
-        pool.Broadcast <- transformedMsg
+        pool.Broadcast <- broadcastMessage
     }
 }
 
@@ -125,7 +138,8 @@ func transformDocumentEvent(CurrentDocumentEvent *models.DocumentEvent, DB *gorm
             }
             for _,DocumentChange:= range prevDocumentChanges{
                 ProcessTransformation(CurrentDocumentEvent,DocumentChange,Document)
-            }            
+            }
+
         }
         return nil
     })
@@ -162,7 +176,13 @@ func (pool *ConnectionPool) StartBroadcasting(){
         log.Printf("message: %v",message)
         pool.Mutex.Lock()
         for connection:= range pool.Connections{
-            err:= connection.WriteMessage(websocket.TextMessage,message)
+            if connection == message.ExcludeConn{
+                slog.Info("The excluded connection is : {}", connection)
+                continue
+            }
+
+            slog.Info("Sending the message as : {}", string(message.Data))
+            err:= connection.WriteMessage(websocket.TextMessage,message.Data)
             if(err != nil){
                 log.Printf("Error writing message: %v", err)
                 connection.Close()
@@ -187,13 +207,17 @@ func (pool *ConnectionPool) ReadMessage(connection *websocket.Conn, DB *gorm.DB)
     for{
         log.Printf("trying to read message")
         _,message,err := connection.ReadMessage()
+        slog.Info("Message recieved via websocket: {}", string(message))
         if err != nil {
             if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
                 log.Printf("Error reading message: %v", err)
             }
             return
         }
-        pool.MessageQueue <- message
+        pool.MessageQueue <- QueuedMessage{
+            Data: message,
+            Sender: connection,
+        }
     }
 }
 
@@ -223,8 +247,13 @@ func applyChangesToDocument(doc *models.Document, event *models.DocumentEvent) e
         return fmt.Errorf("invalid position for character : %v position: %d (content length: %d)",event.Content, event.Position, len(doc.Content))
     }
 
-    doc.Version++
-    event.Version = doc.Version
+    
+    if(event.Version>doc.Version){
+        doc.Version = event.Version
+    }else{
+        doc.Version = doc.Version+1
+        event.Version = doc.Version
+    }
 
     switch event.Operation {
     case "insert":
